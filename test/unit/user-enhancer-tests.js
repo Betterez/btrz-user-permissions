@@ -6,7 +6,7 @@ describe("enhanceRequestUser()", () => {
   const {UserPermissions} = require("../../index.js");
 
   const userId = SimpleDao.objectId().toString();
-  const mockJwtUser = {_id: userId, id: userId, name: "Test", last: "User"};
+  const mockJwtUser = {_id: userId, id: userId, name: "Test", last: "User", role: "test-role"};
   const mockLogger = {
     error(...args) {
       console.error("MockLogger", ...args);
@@ -79,10 +79,10 @@ describe("enhanceRequestUser()", () => {
           accountId: "123"
         },
         user: {
-          id: "non-existent"
+          _id: "non-existent"
         }
       };
-      const expectedError = "userPermissionMiddleware: Failed to fetch user. Check if the user with ID \"non-existent\" exists";
+      const expectedError = "userPermissionMiddleware: Failed to get the role. User with ID \"non-existent\" doesn't have a role set.";
       await middleware(mockRequest, mockResponse, mockNext);
       expect(mockNext.callCount).to.equal(1);
       expect(mockNext.args[0]).lengthOf(1);
@@ -117,7 +117,8 @@ describe("enhanceRequestUser()", () => {
           accountId: "123123123"
         },
         user: {
-          id: "test-test"
+          _id: "test-test",
+          role: "administrator"
         }
       };
       simpleDao = mockSimpleDao({
@@ -138,7 +139,7 @@ describe("enhanceRequestUser()", () => {
       expect(mockNext.callCount).to.equal(1);
       expect(mockNext.args[0]).lengthOf(0);
       expect(mockRequest.user).to.be.an("object");
-      expect(mockRequest.user.permissions).to.deep.equal(permissions);
+      expect(mockRequest.user.permissions).to.deep.equal(mockPermissions);
       expect(mockRequest.user.canCreate).to.be.instanceOf(Function);
       expect(mockRequest.user.canRead).to.be.instanceOf(Function);
       expect(mockRequest.user.canUpdate).to.be.instanceOf(Function);
@@ -194,7 +195,8 @@ describe("enhanceRequestUser()", () => {
           accountId: "123123123"
         },
         user: {
-          id: "test-test"
+          _id: "test-test",
+          role: "test-role"
         }
       };
       userPermission = new UserPermissions({simpleDao, logger: mockLogger}, config);
@@ -239,7 +241,8 @@ describe("enhanceRequestUser()", () => {
             accountId: "123123123"
           },
           user: {
-            id: "test-test"
+            _id: "test-test",
+            role: "test-role"
           }
         };
         userPermission = new UserPermissions({simpleDao, logger: mockLogger}, config);

@@ -8,7 +8,7 @@ describe("Express integration", () => {
   const {UserPermissions} = require("../../index.js");
   const {UserFixture, PermissionFixture} = require("../../models/index.js");
   const userId = SimpleDao.objectId();
-  const testUserFromJwt = {_id: userId, id: userId.toString(), name: "Test", last: "User"};
+  const testUserFromJwt = {_id: userId, id: userId.toString(), name: "Test", last: "User", role: "administrator"};
   const mockAccount = {accountId: "testAccount"};
   const mockLogger = {
     error(...args) {

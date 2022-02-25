@@ -33,7 +33,7 @@ app.use(userPermissions.enhanceRequestUser());
 
 ## Simple Usage
 
-Once initialized, the req.user will now contain the methods `canRead`. `canCreate`, `canUpdate` and `canDelete`.
+Once initialized, the req.user object will now contain the methods `canRead`, `canCreate`, `canUpdate` and `canDelete`.
 
 ```js
 handler(req, res) {
