@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "tdd": "mocha --recursive test/ -w",
-    "test": "mocha --recursive  test/",
+    "test": "mocha --recursive test/ --ui bdd -t 5000 --exit",
     "preversion": "npm test",
     "postversion": "git push origin main && git push --tags",
     "version": "git tag $1"
