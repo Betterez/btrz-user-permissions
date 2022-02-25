@@ -17,10 +17,10 @@ class User {
 class UserFixture {
   static getUserMock(chance, overrides = {}) {
     const model = {
-      _id: SimpleDao.objectId(),
-      role: "test-role"
+      _id: SimpleDao.objectId()
     };
     Object.assign(model, overrides);
+    console.log(model)
     return model;
   }
 

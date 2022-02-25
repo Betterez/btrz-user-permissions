@@ -1,7 +1,9 @@
-const {Permission} = require("./permission.js");
-const {User} = require("./user.js");
+const {Permission, PermissionFixture} = require("./permission.js");
+const {User, UserFixture} = require("./user.js");
 
 module.exports = {
   Permission,
-  User
+  PermissionFixture,
+  User,
+  UserFixture
 };

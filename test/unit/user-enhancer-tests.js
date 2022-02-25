@@ -90,6 +90,92 @@ describe("enhanceRequestUser()", () => {
     });
   });
 
+  describe("with user", () => {
+    const permissions = {
+      "/admin/test/role": {
+        create: false,
+        read: true,
+        update: true,
+        delete: false
+      },
+      "/admin/other/role": {
+        create: false,
+        read: true,
+        update: false,
+        delete: true
+      }
+    };
+    const mockPermissions = {
+      "accountId": "accountId123123",
+      "roleId": "administrator",
+      ...permissions
+    };
+
+    beforeEach(() => {
+      mockRequest = {
+        account: {
+          accountId: "123123123"
+        },
+        user: {
+          id: "test-test"
+        }
+      };
+      simpleDao = mockSimpleDao({
+        findById: {
+          ...mockJwtUser,
+          roles: {
+            administrator: 1
+          }
+        },
+        findOne: mockPermissions
+      });
+      userPermission = new UserPermissions({simpleDao, logger: mockLogger}, config);
+      middleware = userPermission.enhanceRequestUser();
+    });
+
+    it("should call next without an error and enhance req.user", async () => {   
+      await middleware(mockRequest, mockResponse, mockNext);
+      expect(mockNext.callCount).to.equal(1);
+      expect(mockNext.args[0]).lengthOf(0);
+      expect(mockRequest.user).to.be.an("object");
+      expect(mockRequest.user.permissions).to.deep.equal(permissions);
+      expect(mockRequest.user.canCreate).to.be.instanceOf(Function);
+      expect(mockRequest.user.canRead).to.be.instanceOf(Function);
+      expect(mockRequest.user.canUpdate).to.be.instanceOf(Function);
+      expect(mockRequest.user.canDelete).to.be.instanceOf(Function);
+    });
+
+    it("should return false when calling canCreate for path /admin/test/role", async () => {
+      await middleware(mockRequest, mockResponse, mockNext);
+      expect(mockRequest.user.canCreate("/admin/test/role")).to.equal(false);
+    });
+
+    it("should return true when calling canRead for path /admin/test/role", async () => {
+      await middleware(mockRequest, mockResponse, mockNext);
+      expect(mockRequest.user.canRead("/admin/test/role")).to.equal(true);
+    });
+
+    it("should return false when calling canUpdate for path /admin/other/role", async () => {
+      await middleware(mockRequest, mockResponse, mockNext);
+      expect(mockRequest.user.canUpdate("/admin/other/role")).to.equal(false);
+    });
+
+    it("should return true when calling canDelete for path /admin/other/role", async () => {
+      await middleware(mockRequest, mockResponse, mockNext);
+      expect(mockRequest.user.canDelete("/admin/other/role")).to.equal(true);
+    });
+
+    it("should return false when calling canRead for an unknown path", async () => {
+      await middleware(mockRequest, mockResponse, mockNext);
+      expect(mockRequest.user.canRead("/admin/unknown/action")).to.equal(false);
+    });
+
+    it("should return false when calling canRead with an argument that is not a string", async () => {
+      await middleware(mockRequest, mockResponse, mockNext);
+      expect(mockRequest.user.canRead({"hey": ["I broke stuff"]})).to.equal(false);
+    });
+  });
+
   describe("in test enviroment", () => {
     beforeEach(() => {
       simpleDao = mockSimpleDao();
@@ -111,6 +197,8 @@ describe("enhanceRequestUser()", () => {
           id: "test-test"
         }
       };
+      userPermission = new UserPermissions({simpleDao, logger: mockLogger}, config);
+      middleware = userPermission.enhanceRequestUser();
     });
 
     it("should call next without an error if the user a testUser specified in config", async () => {
@@ -134,7 +222,6 @@ describe("enhanceRequestUser()", () => {
     describe("with mock permissions data", () => {
       beforeEach(() => {
         simpleDao = mockSimpleDao({
-          findById: null,
           findOne: {
             "accountId": "123123123",
             "roleId": "test-role",
@@ -146,6 +233,7 @@ describe("enhanceRequestUser()", () => {
             }
           }
         });
+        simpleDao.findById = null;
         mockRequest = {
           account: {
             accountId: "123123123"
@@ -166,12 +254,12 @@ describe("enhanceRequestUser()", () => {
         expect(mockNext.args[0]).lengthOf(0);
       });
 
-      it("should return false for canCreate for permission /admin/test/role", async () => {
+      it("should return false when canCreate is called for path /admin/test/role", async () => {
         await middleware(mockRequest, mockResponse, mockNext);
         expect(mockRequest.user.canCreate("/admin/test/role")).to.equal(false);
       });
 
-      it("should return true for canRead for permission /admin/test/role", async () => {
+      it("should return true when canRead is called for path /admin/test/role", async () => {
         await middleware(mockRequest, mockResponse, mockNext);
         expect(mockRequest.user.canRead("/admin/test/role")).to.equal(true);
       });
