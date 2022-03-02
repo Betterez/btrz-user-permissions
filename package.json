@@ -1,6 +1,6 @@
 {
   "name": "btrz-user-permissions",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Betterez API middleware for enhancing user object with permissions",
   "main": "index.js",
   "scripts": {
