@@ -39,7 +39,7 @@ Once initialized, the req.user object will now contain the methods `canRead`, `c
 handler(req, res) {
     validateSwaggerSchema(validator, this.getSpec(), models, req)
         .then(() => {
-            if (!req.user.canRead("/admin/not/balrog")) {
+            if (!req.user || !req.user.canRead("/admin/not/balrog")) {
                 throw new ValidationError("UNAUTHORIZED", "You shall not pass!");
             }
             return Commands.canContinueOn(exampleData);
@@ -48,5 +48,57 @@ handler(req, res) {
         .catch((err) => {
             responseHandlers.error(res, this.logger)(err);
         });
+}
+```
+
+## Auto completion and simpel documentation
+
+If you ever find the need of not having to look up the documentation for the permissions methods, you can import the UserRequest type from this module.
+
+This will also give you some docs for req.user and req.account objects.
+
+```js
+module.exports = {
+  /**
+   * @param {import("btrz-simple-dao/src/simple-dao").SimpleDao} dao
+   * @param {import("btrz-api-client/types/initializedClient")} apiClient
+   * @param {import("btrz-user-permissions").UserRequest} req
+   */
+  async someAwesomeCommand(dao, apiClient, req) {
+    // Now this will autocomplete!
+    if (!req.user || !req.user.canRead("/admin/not/balrog")) {
+      throw new ValidationError("UNAUTHORIZED", "You shall not pass!");
+    }
+    return Commands.canContinueOn(exampleData);
+  }
+}
+```
+
+or you can get fancy with it and declare the types once and use them multiple times in your code:
+
+
+```js
+/**
+ * @typedef {import("btrz-simple-dao/src/simple-dao").SimpleDao} SimpleDao
+ * @typedef {import("btrz-api-client/types/initializedClient")} ApiClient
+ * @typedef {import("btrz-user-permissions").UserRequest} UserRequest
+ */
+
+module.exports = {
+
+  /// Some lines of awesome code and many repeats later...
+
+  /**
+   * @param {SimpleDao} dao
+   * @param {ApiClient} apiClient
+   * @param {UserRequest} req
+   */
+  async someAwesomeCommand(dao, apiClient, req) {
+    // Now this will autocomplete too!
+    if (!req.user || !req.user.canRead("/admin/not/balrog")) {
+      throw new ValidationError("UNAUTHORIZED", "You shall not pass!");
+    }
+    return Commands.canContinueOn(exampleData);
+  }
 }
 ```
