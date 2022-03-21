@@ -7,11 +7,6 @@ describe("enhanceRequestUser()", () => {
 
   const userId = SimpleDao.objectId().toString();
   const mockJwtUser = {_id: userId, id: userId, name: "Test", last: "User", role: "test-role"};
-  const mockLogger = {
-    error(...args) {
-      console.error("MockLogger", ...args);
-    }
-  };
 
   let simpleDao = null;
 
@@ -46,6 +41,8 @@ describe("enhanceRequestUser()", () => {
   });
 
   describe("without user", () => {
+    let mockLogger = null;
+
     beforeEach(() => {
       simpleDao = mockSimpleDao();
       /**
@@ -57,6 +54,17 @@ describe("enhanceRequestUser()", () => {
       };
       simpleDao.findOne = () => {
         return Promise.resolve(null);
+      };
+      mockLogger = {
+        error: sinon.stub()
+      };
+      mockRequest = {
+        account: {
+          accountId: "123123123"
+        },
+        user: {
+          _id: "test-test"
+        }
       };
       userPermission = new UserPermissions({simpleDao, logger: mockLogger}, config);
       middleware = userPermission.enhanceRequestUser();
@@ -82,11 +90,18 @@ describe("enhanceRequestUser()", () => {
           _id: "non-existent"
         }
       };
-      const expectedError = "userPermissionMiddleware: Failed to get the role. User with ID \"non-existent\" doesn't have a role set.";
       await middleware(mockRequest, mockResponse, mockNext);
+    });
+
+    it("should log an error if trying to call a method without a permissions table", async () => {
+      await middleware(mockRequest, mockResponse, mockNext);
+      mockRequest.user.canRead("/test");
       expect(mockNext.callCount).to.equal(1);
-      expect(mockNext.args[0]).lengthOf(1);
-      expect(mockNext.args[0][0].message).to.equal(expectedError);
+      expect(mockNext.args[0]).lengthOf(0);
+      expect(mockLogger.error.callCount).to.equal(1);
+      expect(mockLogger.error.args[0][0]).to.equal(
+        "userPermissionMiddleware: calling methods without permissions, please check your current account permissions table"
+      );
     });
   });
 
@@ -109,6 +124,9 @@ describe("enhanceRequestUser()", () => {
       "accountId": "accountId123123",
       "roleId": "administrator",
       ...permissions
+    };
+    const mockLogger = {
+      error: sinon.stub()
     };
 
     beforeEach(() => {
@@ -166,9 +184,13 @@ describe("enhanceRequestUser()", () => {
       expect(mockRequest.user.canDelete("/admin/other/role")).to.equal(true);
     });
 
-    it("should return false when calling canRead for an unknown path", async () => {
+    it("should return false when calling canRead and log the error for an unknown path", async () => {
       await middleware(mockRequest, mockResponse, mockNext);
       expect(mockRequest.user.canRead("/admin/unknown/action")).to.equal(false);
+      expect(mockLogger.error.callCount).to.equal(1);
+      expect(mockLogger.error.args[0][0]).to.equal(
+        "userPermissionMiddleware: invalid or missing permission path /admin/unknown/action for the current user's permissions"
+      );
     });
 
     it("should return false when calling canRead with an argument that is not a string", async () => {
@@ -178,6 +200,7 @@ describe("enhanceRequestUser()", () => {
   });
 
   describe("in test enviroment", () => {
+    let mockLogger = null;
     beforeEach(() => {
       simpleDao = mockSimpleDao();
       /**
@@ -199,6 +222,9 @@ describe("enhanceRequestUser()", () => {
           role: "test-role"
         }
       };
+      mockLogger = {
+        error: sinon.stub()
+      };
       userPermission = new UserPermissions({simpleDao, logger: mockLogger}, config);
       middleware = userPermission.enhanceRequestUser();
     });
@@ -209,10 +235,10 @@ describe("enhanceRequestUser()", () => {
       expect(mockNext.args[0]).lengthOf(0);
     });
 
-    it("should enhance the req.user permissions with an empty object if none in db for the testUser", async () => {
+    it("should enhance the req.user permissions with null if none in db for the testUser", async () => {
       await middleware(mockRequest, mockResponse, mockNext);
       expect(mockRequest.user).to.be.an("object");
-      expect(mockRequest.user.permissions).to.deep.equal({});
+      expect(mockRequest.user.permissions).to.deep.equal(null);
       expect(mockRequest.user.canCreate).to.be.instanceOf(Function);
       expect(mockRequest.user.canRead).to.be.instanceOf(Function);
       expect(mockRequest.user.canUpdate).to.be.instanceOf(Function);
@@ -244,6 +270,9 @@ describe("enhanceRequestUser()", () => {
             _id: "test-test",
             role: "test-role"
           }
+        };
+        const mockLogger = {
+          error: sinon.stub()
         };
         userPermission = new UserPermissions({simpleDao, logger: mockLogger}, config);
         middleware = userPermission.enhanceRequestUser();

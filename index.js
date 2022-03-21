@@ -46,6 +46,18 @@ function UserPermissions({simpleDao, logger}, options) {
     return user.role;
   }
 
+  function getPermissions(permissions, path) {
+    if (!permissions) {
+      logger.error("userPermissionMiddleware: calling methods without permissions, please check your current account permissions table");
+      return {};
+    }
+    const permission = permissions[path];
+    if (!permission) {
+      logger.error(`userPermissionMiddleware: invalid or missing permission path ${path} for the current user's permissions`);
+    }
+    return permission;
+  }
+
   /**
    * Fetchs all the permissions for a given role for the account
    * @param {*} accountId
@@ -53,6 +65,10 @@ function UserPermissions({simpleDao, logger}, options) {
    * @returns {Permission}
    */
   async function getRolePermissionsForUser(accountId, roleId) {
+    if (!roleId) {
+      return null;
+    }
+
     const rolePermissions = await simpleDao.for(Permission).findOne({
       roleId,
       accountId
@@ -69,7 +85,7 @@ function UserPermissions({simpleDao, logger}, options) {
     *   );
     * }
     */
-    return rolePermissions || {};
+    return rolePermissions;
   }
 
   /**
@@ -82,7 +98,7 @@ function UserPermissions({simpleDao, logger}, options) {
     reqUser.permissions = permissions;
     // eslint-disable-next-line no-param-reassign
     reqUser.canCreate = function canCreate(path) {
-      const permission = this.permissions[path];
+      const permission = getPermissions(this.permissions, path);
       if (permission && permission.create) {
         return permission.create;
       }
@@ -90,7 +106,7 @@ function UserPermissions({simpleDao, logger}, options) {
     };
     // eslint-disable-next-line no-param-reassign
     reqUser.canRead = function canRead(path) {
-      const permission = this.permissions[path];
+      const permission = getPermissions(this.permissions, path);
       if (permission && permission.read) {
         return permission.read;
       }
@@ -98,7 +114,7 @@ function UserPermissions({simpleDao, logger}, options) {
     };
     // eslint-disable-next-line no-param-reassign
     reqUser.canUpdate = function canUpdate(path) {
-      const permission = this.permissions[path];
+      const permission = getPermissions(this.permissions, path);
       if (permission && permission.update) {
         return permission.update;
       }
@@ -106,7 +122,7 @@ function UserPermissions({simpleDao, logger}, options) {
     };
     // eslint-disable-next-line no-param-reassign
     reqUser.canDelete = function canDelete(path) {
-      const permission = this.permissions[path];
+      const permission = getPermissions(this.permissions, path);
       if (permission && permission.delete) {
         return permission.delete;
       }
@@ -127,11 +143,14 @@ function UserPermissions({simpleDao, logger}, options) {
       try {
         const accountId = req.account.accountId;
         const userRole = getUserRole(req.user);
-        if (!userRole) {
-          throw new Error(
-            `userPermissionMiddleware: Failed to get the role. User with ID "${req.user._id}" doesn't have a role set.`
-          );
-        }
+        /**
+         * if (!userRole) {
+         *  throw new Error(
+         *    `userPermissionMiddleware: Failed to get the role. User with ID "${req.user._id}" doesn't have a role set.`
+         *  );
+         *}
+         */
+
         const permissionsForAccountRole = await getRolePermissionsForUser(accountId, userRole);
         req.user = enhanceUserWithPermissions(req.user, permissionsForAccountRole);
         return next();
