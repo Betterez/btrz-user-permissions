@@ -57,11 +57,18 @@ function UserPermissions({simpleDao, logger}, options) {
       roleId,
       accountId
     });
-    if (!rolePermissions && roleId !== TEST_ROLE) {
-      throw new Error(
-        `userPermissionMiddleware: Failed to fetch permissions, account "${accountId}" doesn't have any for the role ${roleId}`
-      );
-    }
+
+    /**
+    * Let's ignore this for now, silently fail if
+    * there is no "role", since not all JWT tokens
+    * will have it when deployed to production
+    *
+    * if (!rolePermissions && roleId !== TEST_ROLE) {
+    *   throw new Error(
+    *     `userPermissionMiddleware: Failed to fetch permissions, account "${accountId}" doesn't have any for the role ${roleId}`
+    *   );
+    * }
+    */
     return rolePermissions || {};
   }
 
