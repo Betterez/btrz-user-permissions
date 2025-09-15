@@ -1,3 +1,4 @@
+
 describe("Express integration", () => {
   const request = require("supertest");
   const {expect} = require("chai");
@@ -5,7 +6,7 @@ describe("Express integration", () => {
   const {SimpleDao} = require("btrz-simple-dao");
   const {MongoFactory, createFixture} = require("btrz-mongo-factory");
   const {UserPermissions} = require("../../index.js");
-  const {User, UserFixture, PermissionFixture} = require("../../models/index.js");
+  const {UserFixture, PermissionFixture} = require("../../models/index.js");
   const userId = SimpleDao.objectId();
   const testUserFromJwt = {_id: userId, id: userId.toString(), name: "Test", last: "User", role: "administrator"};
   const mockAccount = {accountId: "testAccount"};
@@ -41,10 +42,6 @@ describe("Express integration", () => {
     db: config.db
   };
   const fixturesFactory = new MongoFactory(fixtureFactoryOptions);
-
-  async function updateUser(userId, update) {
-    return simpleDao.for(User).update({_id: SimpleDao.objectId(userId)}, {$set: update});
-  }
 
   let app = null;
   let userPermission = null;
@@ -154,48 +151,6 @@ describe("Express integration", () => {
         }
         return done();
       });
-  });
-
-  it("should return 200 if the user has been granted temporary permissions for the path /admin/test/path", async () => {
-    await updateUser(userId, {
-      temporaryPermissions: [
-        {
-          actionName: "some-action",
-          permissions: {
-            "/admin/test/path": {
-              create: true
-            }
-          },
-          expires: "2999-01-01T00:00:00.000Z"
-        }
-      ]
-    });
-
-    await request(app)
-      .get("/create-test")
-      .set("Accept", "application/json")
-      .expect(200);
-  });
-
-  it("should return 403 if the user has been granted temporary permissions for the path /admin/test/path, but the permissions have expired", async () => {
-    await updateUser(userId, {
-      temporaryPermissions: [
-        {
-          actionName: "some-action",
-          permissions: {
-            "/admin/test/path": {
-              create: true
-            }
-          },
-          expires: "2000-01-01T00:00:00.000Z"
-        }
-      ]
-    });
-
-    await request(app)
-      .get("/create-test")
-      .set("Accept", "application/json")
-      .expect(403);
   });
 
   it("should return 403 if user does not have update permission for the path /admin/test/path", (done) => {

@@ -1,4 +1,5 @@
 /**
+ * @typedef {import("btrz-simple-dao/src/simple-dao").SimpleDao} SimpleDao
  * @typedef {import("btrz-logger/src/logger").Logger} Logger
  */
 
@@ -10,9 +11,7 @@
  * @param {Object} options Auth config options
  */
 function UserPermissions({simpleDao, logger}, options) {
-  const {SimpleDao} = require("btrz-simple-dao");
   const {Permission} = require("./models/index.js");
-  const {User} = require("./models/user.js");
   const {TEST_ROLE} = require("./constants.js");
 
   if (!simpleDao) {
@@ -47,33 +46,16 @@ function UserPermissions({simpleDao, logger}, options) {
     return user.role;
   }
 
-  function getPermissions(permissions, temporaryPermissions, path) {
+  function getPermissions(permissions, path) {
     if (!permissions) {
       logger.error("userPermissionMiddleware: calling methods without permissions, please check your current account permissions table");
       return {};
     }
-    if (!permissions[path]) {
+    const permission = permissions[path];
+    if (!permission) {
       logger.error(`userPermissionMiddleware: invalid or missing permission path ${path} for the current user's permissions`);
     }
-
-    const now = new Date();
-    const temporaryPermissionsForPath = temporaryPermissions.filter((literal) => {
-      return Object.hasOwn(literal.permissions, path);
-    }).filter((literal) => {
-      return new Date(literal.expires) > now;
-    }).map((literal) => {
-      return literal.permissions[path];
-    }).reduce((acc, permissions) => {
-      return {
-        ...acc,
-        ...permissions
-      };
-    }, {});
-
-    return {
-      ...permissions[path],
-      ...temporaryPermissionsForPath
-    };
+    return permission;
   }
 
   /**
@@ -107,57 +89,45 @@ function UserPermissions({simpleDao, logger}, options) {
   }
 
   /**
-   * Fetches all of the temporary permissions for a given user.
-   * @param {*} userId
-   */
-  async function getTemporaryPermissionsForUser(userId) {
-    if (!userId) {
-      return [];
-    }
-
-    const user = await simpleDao.for(User).findOne({_id: SimpleDao.objectId(userId)}, {temporaryPermissions: 1});
-    return user?.temporaryPermissions || [];
-  }
-
-  /**
    * Adds permissions methods to the request user object
    * @param {Request} reqUser Express user object
    * @param {Permission} permissions Permission object
    */
-  function enhanceUserWithPermissions(reqUser, permissions, temporaryPermissions) {
-    /* eslint-disable no-param-reassign */
+  function enhanceUserWithPermissions(reqUser, permissions) {
+    // eslint-disable-next-line no-param-reassign
     reqUser.permissions = permissions;
-    reqUser.temporaryPermissions = temporaryPermissions;
-
+    // eslint-disable-next-line no-param-reassign
     reqUser.canCreate = function canCreate(path) {
-      const permission = getPermissions(this.permissions, this.temporaryPermissions, path);
+      const permission = getPermissions(this.permissions, path);
       if (permission && permission.create) {
         return permission.create;
       }
       return false;
     };
+    // eslint-disable-next-line no-param-reassign
     reqUser.canRead = function canRead(path) {
-      const permission = getPermissions(this.permissions, this.temporaryPermissions, path);
+      const permission = getPermissions(this.permissions, path);
       if (permission && permission.read) {
         return permission.read;
       }
       return false;
     };
+    // eslint-disable-next-line no-param-reassign
     reqUser.canUpdate = function canUpdate(path) {
-      const permission = getPermissions(this.permissions, this.temporaryPermissions, path);
+      const permission = getPermissions(this.permissions, path);
       if (permission && permission.update) {
         return permission.update;
       }
       return false;
     };
+    // eslint-disable-next-line no-param-reassign
     reqUser.canDelete = function canDelete(path) {
-      const permission = getPermissions(this.permissions, this.temporaryPermissions, path);
+      const permission = getPermissions(this.permissions, path);
       if (permission && permission.delete) {
         return permission.delete;
       }
       return false;
     };
-    /* eslint-enable no-param-reassign */
 
     return reqUser;
   }
@@ -181,14 +151,8 @@ function UserPermissions({simpleDao, logger}, options) {
          *}
          */
 
-        const [
-          permissionsForAccountRole,
-          temporaryPermissionsForUser
-        ] = await Promise.all([
-          getRolePermissionsForUser(accountId, userRole),
-          getTemporaryPermissionsForUser(req.user._id)
-        ]);
-        req.user = enhanceUserWithPermissions(req.user, permissionsForAccountRole, temporaryPermissionsForUser);
+        const permissionsForAccountRole = await getRolePermissionsForUser(accountId, userRole);
+        req.user = enhanceUserWithPermissions(req.user, permissionsForAccountRole);
         return next();
       } catch (e) {
         logger.error(e.message);

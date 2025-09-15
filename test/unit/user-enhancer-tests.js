@@ -23,7 +23,7 @@ describe("enhanceRequestUser()", () => {
 
   const config = {
     "testUser": {
-      _id: "66d8a8e0530153052b3953fc"
+      _id: "test-test"
     }
   };
 
@@ -63,7 +63,7 @@ describe("enhanceRequestUser()", () => {
           accountId: "123123123"
         },
         user: {
-          _id: "66d8a8e0530153052b3953fc"
+          _id: "test-test"
         }
       };
       userPermission = new UserPermissions({simpleDao, logger: mockLogger}, config);
@@ -106,44 +106,38 @@ describe("enhanceRequestUser()", () => {
   });
 
   describe("with user", () => {
-    let permissions;
-    let mockPermissions;
-    let mockUser;
-
+    const permissions = {
+      "/admin/test/role": {
+        create: false,
+        read: true,
+        update: true,
+        delete: false
+      },
+      "/admin/other/role": {
+        create: false,
+        read: true,
+        update: false,
+        delete: true
+      }
+    };
+    const mockPermissions = {
+      "accountId": "accountId123123",
+      "roleId": "administrator",
+      ...permissions
+    };
     const mockLogger = {
       error: sinon.stub()
     };
 
     beforeEach(() => {
-      permissions = {
-        "/admin/test/role": {
-          create: false,
-          read: true,
-          update: true,
-          delete: false
-        },
-        "/admin/other/role": {
-          create: false,
-          read: true,
-          update: false,
-          delete: true
-        }
-      };
-      mockPermissions = {
-        "accountId": "accountId123123",
-        "roleId": "administrator",
-        ...permissions
-      };
-      mockUser = {
-        _id: "66d8a8e0530153052b3953fc",
-        role: "administrator",
-        temporaryPermissions: []
-      };
       mockRequest = {
         account: {
           accountId: "123123123"
         },
-        user: mockUser
+        user: {
+          _id: "test-test",
+          role: "administrator"
+        }
       };
       simpleDao = mockSimpleDao({
         findById: {
@@ -154,21 +148,11 @@ describe("enhanceRequestUser()", () => {
         },
         findOne: mockPermissions
       });
-      simpleDao.findOne = sinon.stub()
-        .onFirstCall()
-        .resolves(mockPermissions)
-        .onSecondCall()
-        .resolves(mockUser);
-
       userPermission = new UserPermissions({simpleDao, logger: mockLogger}, config);
       middleware = userPermission.enhanceRequestUser();
     });
 
-    afterEach(() => {
-      sinon.restore();
-    });
-
-    it("should call next without an error and enhance req.user", async () => {
+    it("should call next without an error and enhance req.user", async () => {   
       await middleware(mockRequest, mockResponse, mockNext);
       expect(mockNext.callCount).to.equal(1);
       expect(mockNext.args[0]).lengthOf(0);
@@ -178,6 +162,26 @@ describe("enhanceRequestUser()", () => {
       expect(mockRequest.user.canRead).to.be.instanceOf(Function);
       expect(mockRequest.user.canUpdate).to.be.instanceOf(Function);
       expect(mockRequest.user.canDelete).to.be.instanceOf(Function);
+    });
+
+    it("should return false when calling canCreate for path /admin/test/role", async () => {
+      await middleware(mockRequest, mockResponse, mockNext);
+      expect(mockRequest.user.canCreate("/admin/test/role")).to.equal(false);
+    });
+
+    it("should return true when calling canRead for path /admin/test/role", async () => {
+      await middleware(mockRequest, mockResponse, mockNext);
+      expect(mockRequest.user.canRead("/admin/test/role")).to.equal(true);
+    });
+
+    it("should return false when calling canUpdate for path /admin/other/role", async () => {
+      await middleware(mockRequest, mockResponse, mockNext);
+      expect(mockRequest.user.canUpdate("/admin/other/role")).to.equal(false);
+    });
+
+    it("should return true when calling canDelete for path /admin/other/role", async () => {
+      await middleware(mockRequest, mockResponse, mockNext);
+      expect(mockRequest.user.canDelete("/admin/other/role")).to.equal(true);
     });
 
     it("should return false when calling canRead and log the error for an unknown path", async () => {
@@ -192,90 +196,6 @@ describe("enhanceRequestUser()", () => {
     it("should return false when calling canRead with an argument that is not a string", async () => {
       await middleware(mockRequest, mockResponse, mockNext);
       expect(mockRequest.user.canRead({"hey": ["I broke stuff"]})).to.equal(false);
-    });
-
-    it("should return false when querying for a permission that has not been assigned to the user", async () => {
-      mockPermissions["/admin/test/role"] = {
-        create: false,
-        read: false,
-        update: false,
-        delete: false
-      };
-
-      await middleware(mockRequest, mockResponse, mockNext);
-      expect(mockRequest.user.canRead("/admin/test/role")).to.equal(false);
-      expect(mockRequest.user.canCreate("/admin/test/role")).to.equal(false);
-      expect(mockRequest.user.canUpdate("/admin/test/role")).to.equal(false);
-      expect(mockRequest.user.canDelete("/admin/test/role")).to.equal(false);
-    });
-
-    it("should return true when querying for a permission that has not been assigned to the user", async () => {
-      mockPermissions["/admin/test/role"] = {
-        create: true,
-        read: true,
-        update: true,
-        delete: true
-      };
-
-      await middleware(mockRequest, mockResponse, mockNext);
-      expect(mockRequest.user.canRead("/admin/test/role")).to.equal(true);
-      expect(mockRequest.user.canCreate("/admin/test/role")).to.equal(true);
-      expect(mockRequest.user.canUpdate("/admin/test/role")).to.equal(true);
-      expect(mockRequest.user.canDelete("/admin/test/role")).to.equal(true);
-    });
-
-    it("should return true when querying for a permission that has been temporarily granted to the user", async () => {
-      mockPermissions["/admin/test/role"] = {
-        create: false,
-        read: false,
-        update: false,
-        delete: false
-      };
-      mockUser.temporaryPermissions = [{
-        actionName: "some-action",
-        permissions: {
-          "/admin/test/role": {
-            create: true,
-            read: true,
-            update: true,
-            delete: true
-          }
-        },
-        expires: "2999-01-01T00:00:00.000Z"
-      }];
-
-      await middleware(mockRequest, mockResponse, mockNext);
-      expect(mockRequest.user.canRead("/admin/test/role")).to.equal(true);
-      expect(mockRequest.user.canCreate("/admin/test/role")).to.equal(true);
-      expect(mockRequest.user.canUpdate("/admin/test/role")).to.equal(true);
-      expect(mockRequest.user.canDelete("/admin/test/role")).to.equal(true);
-    });
-
-    it("should return false when querying for a permission that has been temporarily granted to the user, but the grant has expired", async () => {
-      mockPermissions["/admin/test/role"] = {
-        create: false,
-        read: false,
-        update: false,
-        delete: false
-      };
-      mockUser.temporaryPermissions = [{
-        actionName: "some-action",
-        permissions: {
-          "/admin/test/role": {
-            create: true,
-            read: true,
-            update: true,
-            delete: true
-          }
-        },
-        expires: "2000-01-01T00:00:00.000Z"
-      }];
-
-      await middleware(mockRequest, mockResponse, mockNext);
-      expect(mockRequest.user.canRead("/admin/test/role")).to.equal(false);
-      expect(mockRequest.user.canCreate("/admin/test/role")).to.equal(false);
-      expect(mockRequest.user.canUpdate("/admin/test/role")).to.equal(false);
-      expect(mockRequest.user.canDelete("/admin/test/role")).to.equal(false);
     });
   });
 
@@ -298,7 +218,7 @@ describe("enhanceRequestUser()", () => {
           accountId: "123123123"
         },
         user: {
-          _id: "66d8a8e0530153052b3953fc",
+          _id: "test-test",
           role: "test-role"
         }
       };
@@ -347,7 +267,7 @@ describe("enhanceRequestUser()", () => {
             accountId: "123123123"
           },
           user: {
-            _id: "66d8a8e0530153052b3953fc",
+            _id: "test-test",
             role: "test-role"
           }
         };

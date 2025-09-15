@@ -10,7 +10,6 @@ class User {
     const user = new User();
     user._id = literal._id;
     user.role = Object.keys(literal.roles)[0] || "";
-    user.temporaryPermissions = literal.temporaryPermissions || [];
     return user;
   }
 }
@@ -21,6 +20,7 @@ class UserFixture {
       _id: SimpleDao.objectId()
     };
     Object.assign(model, overrides);
+    console.log(model)
     return model;
   }
 
